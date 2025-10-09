@@ -1,0 +1,152 @@
+version: "3.3"
+
+volumes:
+  spacer_db:
+  postgres:
+  pgadmin:
+
+services:
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4:9.8.0
+    hostname: pgadmin
+    restart: unless-stopped
+    env_file:
+      - ./env_files/pgadmin.env
+    ports:
+      - "8999:80"
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.3
+    volumes:
+      - pgadmin:/var/lib/pgadmin:z
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/misc/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    container_name: postgres
+    image: postgres:18.0-alpine3.21
+    hostname: postgres
+    restart: always
+    env_file:
+      - ./env_files/guacamole.env
+    environment:
+      - TZ=Europe/Moscow
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.4
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - ./_data/postgres:/docker-entrypoint-initdb.d:z
+      - postgres:/var/lib/postgresql/data
+
+  guacd:
+    container_name: guacd
+    hostname: guacd
+    image: guacamole/guacd:1.5.5
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.5
+    volumes:
+      - ./_data/guacd/drive:/drive:rw
+      - ./_data/guacd/record:/record:rw
+    healthcheck:
+      test: ["CMD", "netstat", "-an", "|", "grep", ":4822"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  guacamole:
+    container_name: guacamole
+    hostname: guacamole
+    image: guacamole/guacamole:1.5.5
+    restart: always
+    depends_on:
+      - guacd
+      - postgres
+    environment:
+      - TZ=Europe/Moscow
+    env_file:
+      - ./env_files/guacamole.env
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.6
+    volumes:
+      - ./_data/guacamole:/etc/guacamole:ro
+      - ./_data/guacd/record:/record:rw
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/guacamole/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  guacamole_recordings:
+    container_name: guacamole_recordings
+    image: tomcat:10.1-jdk17
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+    # ports:
+    #   - "8081:8080"
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.7
+    volumes:
+      - ./_data/guacd/record:/recordings:ro
+      - ./_data/tomcat/conf/Catalina/localhost:/usr/local/tomcat/conf/Catalina/localhost:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  webapi:
+    container_name: webapi
+    hostname: webapi
+    image: webapi:latest
+    build:
+      context: ./services/webapi
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    ports:
+      - "8001:8000"
+    env_file:
+      - ./env_files/postgres.env
+    depends_on:
+      - postgres
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.8
+    volumes:
+      - ./services/webapi:/app
+      - ./_data/guacd/record:/record:ro
+    command: "bash"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  guacnetwork_compose:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24

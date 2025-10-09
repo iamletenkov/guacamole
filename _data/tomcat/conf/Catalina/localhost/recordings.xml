@@ -1,0 +1,10 @@
+<Context docBase="/recordings">
+  <Resources allowLinking="true"/>
+  <Servlet>
+    <ServletName>default</ServletName>
+    <InitParam>
+      <ParamName>listings</ParamName>
+      <ParamValue>true</ParamValue>
+    </InitParam>
+  </Servlet>
+</Context>
