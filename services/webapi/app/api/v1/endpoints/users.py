@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.db.session import get_db
 from app.models.guac.entity import GuacamoleEntity
@@ -29,6 +29,7 @@ class UserCreate(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     user_id: int
     name: str
     full_name: str | None = None
@@ -46,10 +47,10 @@ class UserOut(BaseModel):
         )
 
 
-@router.get("/", response_model=list[UserOut])
+@router.get("/", response_model=List[UserOut])
 def list_users(
     limit: int = 100, offset: int = 0, db: Session = db_dependency
-) -> list[UserOut]:
+) -> List[UserOut]:
     repo = UserRepository(db)
     users = repo.list_users(limit=limit, offset=offset)
     # Load entities for names

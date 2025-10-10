@@ -33,3 +33,4 @@ class GuacamoleConnection(Base):
     proxy_port = Column(Integer)
     proxy_hostname = Column(String(512))
     proxy_encryption_method = Column(guacamole_proxy_encryption_method)
+

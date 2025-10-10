@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -55,10 +55,10 @@ def set_user_attribute(
     return {"status": "ok"}
 
 
-@router.get("/users/{user_id}/attributes", response_model=list[AttributeOut])
+@router.get("/users/{user_id}/attributes", response_model=List[AttributeOut])
 def get_user_attributes(
     user_id: int, db: Session = db_dependency
-) -> list[AttributeOut]:
+) -> List[AttributeOut]:
     stmt = db.query(GuacamoleUserAttribute).filter(
         GuacamoleUserAttribute.user_id == user_id
     )
@@ -108,11 +108,11 @@ def set_user_group_attribute(
 
 
 @router.get(
-    "/user-groups/{user_group_id}/attributes", response_model=list[AttributeOut]
+    "/user-groups/{user_group_id}/attributes", response_model=List[AttributeOut]
 )
 def get_user_group_attributes(
     user_group_id: int, db: Session = db_dependency
-) -> list[AttributeOut]:
+) -> List[AttributeOut]:
     stmt = db.query(GuacamoleUserGroupAttribute).filter(
         GuacamoleUserGroupAttribute.user_group_id == user_group_id
     )
@@ -147,11 +147,11 @@ def set_connection_attribute(
 
 
 @router.get(
-    "/connections/{connection_id}/attributes", response_model=list[AttributeOut]
+    "/connections/{connection_id}/attributes", response_model=List[AttributeOut]
 )
 def get_connection_attributes(
     connection_id: int, db: Session = db_dependency
-) -> list[AttributeOut]:
+) -> List[AttributeOut]:
     stmt = db.query(GuacamoleConnectionAttribute).filter(
         GuacamoleConnectionAttribute.connection_id == connection_id
     )
@@ -188,11 +188,11 @@ def set_connection_group_attribute(
 
 @router.get(
     "/connection-groups/{connection_group_id}/attributes",
-    response_model=list[AttributeOut],
+    response_model=List[AttributeOut],
 )
 def get_connection_group_attributes(
     connection_group_id: int, db: Session = db_dependency
-) -> list[AttributeOut]:
+) -> List[AttributeOut]:
     stmt = db.query(GuacamoleConnectionGroupAttribute).filter(
         GuacamoleConnectionGroupAttribute.connection_group_id == connection_group_id
     )

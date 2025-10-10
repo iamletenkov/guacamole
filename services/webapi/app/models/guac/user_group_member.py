@@ -30,3 +30,4 @@ class GuacamoleUserGroupMember(Base):
     )
 
     __table_args__ = (PrimaryKeyConstraint("user_group_id", "member_entity_id"),)
+

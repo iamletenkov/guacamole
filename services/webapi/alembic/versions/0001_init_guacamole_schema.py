@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 
 from alembic import op
+from sqlalchemy.dialects.postgresql import ENUM as PGEnum
 
 # from sqlalchemy.dialects import postgresql as pg  # noqa: F401
 
@@ -22,36 +23,52 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Enums (names must match exactly)
-    connection_group_type = sa.Enum(
-        "ORGANIZATIONAL", "BALANCING", name="guacamole_connection_group_type"
+    # Enums (create safely if not exists)
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE guacamole_connection_group_type AS ENUM ('ORGANIZATIONAL', 'BALANCING');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END$$;
+        """
     )
-    entity_type = sa.Enum("USER", "USER_GROUP", name="guacamole_entity_type")
-    object_permission_type = sa.Enum(
-        "READ",
-        "UPDATE",
-        "DELETE",
-        "ADMINISTER",
-        name="guacamole_object_permission_type",
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE guacamole_entity_type AS ENUM ('USER', 'USER_GROUP');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END$$;
+        """
     )
-    system_permission_type = sa.Enum(
-        "CREATE_CONNECTION",
-        "CREATE_CONNECTION_GROUP",
-        "CREATE_SHARING_PROFILE",
-        "CREATE_USER",
-        "CREATE_USER_GROUP",
-        "ADMINISTER",
-        name="guacamole_system_permission_type",
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE guacamole_object_permission_type AS ENUM ('READ','UPDATE','DELETE','ADMINISTER');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END$$;
+        """
     )
-    proxy_encryption_method = sa.Enum(
-        "NONE", "SSL", name="guacamole_proxy_encryption_method"
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE guacamole_system_permission_type AS ENUM ('CREATE_CONNECTION','CREATE_CONNECTION_GROUP','CREATE_SHARING_PROFILE','CREATE_USER','CREATE_USER_GROUP','ADMINISTER');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END$$;
+        """
     )
-
-    connection_group_type.create(op.get_bind(), checkfirst=True)
-    entity_type.create(op.get_bind(), checkfirst=True)
-    object_permission_type.create(op.get_bind(), checkfirst=True)
-    system_permission_type.create(op.get_bind(), checkfirst=True)
-    proxy_encryption_method.create(op.get_bind(), checkfirst=True)
+    op.execute(
+        """
+        DO $$
+        BEGIN
+            CREATE TYPE guacamole_proxy_encryption_method AS ENUM ('NONE','SSL');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END$$;
+        """
+    )
 
     # Tables
     op.create_table(
@@ -63,7 +80,12 @@ def upgrade() -> None:
         sa.Column("connection_group_name", sa.String(128), nullable=False),
         sa.Column(
             "type",
-            connection_group_type,
+            PGEnum(
+                "ORGANIZATIONAL",
+                "BALANCING",
+                name="guacamole_connection_group_type",
+                create_type=False,
+            ),
             nullable=False,
             server_default="ORGANIZATIONAL",
         ),
@@ -94,7 +116,16 @@ def upgrade() -> None:
         ),
         sa.Column("proxy_port", sa.Integer(), nullable=True),
         sa.Column("proxy_hostname", sa.String(512), nullable=True),
-        sa.Column("proxy_encryption_method", proxy_encryption_method, nullable=True),
+        sa.Column(
+            "proxy_encryption_method",
+            PGEnum(
+                "NONE",
+                "SSL",
+                name="guacamole_proxy_encryption_method",
+                create_type=False,
+            ),
+            nullable=True,
+        ),
     )
 
     # FK for connection_group parent, and connection.parent -> connection_group
@@ -145,7 +176,16 @@ def upgrade() -> None:
         "guacamole_entity",
         sa.Column("entity_id", sa.Integer(), primary_key=True, nullable=False),
         sa.Column("name", sa.String(128), nullable=False),
-        sa.Column("type", entity_type, nullable=False),
+        sa.Column(
+            "type",
+            PGEnum(
+                "USER",
+                "USER_GROUP",
+                name="guacamole_entity_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
     )
     op.create_unique_constraint(
         "guacamole_entity_name_scope", "guacamole_entity", ["type", "name"]
@@ -384,7 +424,18 @@ def upgrade() -> None:
         "guacamole_connection_permission",
         sa.Column("entity_id", sa.Integer(), nullable=False),
         sa.Column("connection_id", sa.Integer(), nullable=False),
-        sa.Column("permission", object_permission_type, nullable=False),
+        sa.Column(
+            "permission",
+            PGEnum(
+                "READ",
+                "UPDATE",
+                "DELETE",
+                "ADMINISTER",
+                name="guacamole_object_permission_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("entity_id", "connection_id", "permission"),
     )
     op.create_foreign_key(
@@ -418,7 +469,18 @@ def upgrade() -> None:
         "guacamole_connection_group_permission",
         sa.Column("entity_id", sa.Integer(), nullable=False),
         sa.Column("connection_group_id", sa.Integer(), nullable=False),
-        sa.Column("permission", object_permission_type, nullable=False),
+        sa.Column(
+            "permission",
+            PGEnum(
+                "READ",
+                "UPDATE",
+                "DELETE",
+                "ADMINISTER",
+                name="guacamole_object_permission_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("entity_id", "connection_group_id", "permission"),
     )
     op.create_foreign_key(
@@ -452,7 +514,18 @@ def upgrade() -> None:
         "guacamole_sharing_profile_permission",
         sa.Column("entity_id", sa.Integer(), nullable=False),
         sa.Column("sharing_profile_id", sa.Integer(), nullable=False),
-        sa.Column("permission", object_permission_type, nullable=False),
+        sa.Column(
+            "permission",
+            PGEnum(
+                "READ",
+                "UPDATE",
+                "DELETE",
+                "ADMINISTER",
+                name="guacamole_object_permission_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("entity_id", "sharing_profile_id", "permission"),
     )
     op.create_foreign_key(
@@ -486,7 +559,18 @@ def upgrade() -> None:
         "guacamole_user_permission",
         sa.Column("entity_id", sa.Integer(), nullable=False),
         sa.Column("affected_user_id", sa.Integer(), nullable=False),
-        sa.Column("permission", object_permission_type, nullable=False),
+        sa.Column(
+            "permission",
+            PGEnum(
+                "READ",
+                "UPDATE",
+                "DELETE",
+                "ADMINISTER",
+                name="guacamole_object_permission_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("entity_id", "affected_user_id", "permission"),
     )
     op.create_foreign_key(
@@ -520,7 +604,18 @@ def upgrade() -> None:
         "guacamole_user_group_permission",
         sa.Column("entity_id", sa.Integer(), nullable=False),
         sa.Column("affected_user_group_id", sa.Integer(), nullable=False),
-        sa.Column("permission", object_permission_type, nullable=False),
+        sa.Column(
+            "permission",
+            PGEnum(
+                "READ",
+                "UPDATE",
+                "DELETE",
+                "ADMINISTER",
+                name="guacamole_object_permission_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("entity_id", "affected_user_group_id", "permission"),
     )
     op.create_foreign_key(
@@ -553,7 +648,20 @@ def upgrade() -> None:
     op.create_table(
         "guacamole_system_permission",
         sa.Column("entity_id", sa.Integer(), nullable=False),
-        sa.Column("permission", system_permission_type, nullable=False),
+        sa.Column(
+            "permission",
+            PGEnum(
+                "CREATE_CONNECTION",
+                "CREATE_CONNECTION_GROUP",
+                "CREATE_SHARING_PROFILE",
+                "CREATE_USER",
+                "CREATE_USER_GROUP",
+                "ADMINISTER",
+                name="guacamole_system_permission_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("entity_id", "permission"),
     )
     op.create_foreign_key(

@@ -19,3 +19,4 @@ class GuacamoleEntity(Base):
     __table_args__ = (
         UniqueConstraint("type", "name", name="guacamole_entity_name_scope"),
     )
+

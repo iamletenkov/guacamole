@@ -22,3 +22,4 @@ class GuacamoleUserGroup(Base):
         unique=True,
     )
     disabled = Column(Boolean, nullable=False, default=False)
+

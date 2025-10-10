@@ -110,3 +110,4 @@ def downgrade() -> None:
         DELETE FROM guacamole_entity WHERE name='guacadmin' AND type='USER';
     """
     )
+

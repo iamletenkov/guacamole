@@ -83,3 +83,4 @@ class GuacamoleUserPasswordHistory(Base):
     )  # left as String for brevity; stored as bytea via migration
     password_salt = Column("password_salt", String)
     password_date = Column(DateTime(timezone=True), nullable=False)
+

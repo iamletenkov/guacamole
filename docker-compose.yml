@@ -19,7 +19,7 @@ services:
       guacnetwork_compose:
         ipv4_address: 172.29.0.3
     volumes:
-      - pgadmin:/var/lib/pgadmin:z
+      - pgadmin:/var/lib/pgadmin
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/misc/ping"]
       interval: 30s
@@ -33,7 +33,7 @@ services:
     hostname: postgres
     restart: always
     env_file:
-      - ./env_files/guacamole.env
+      - ./env_files/postgres.env
     environment:
       - TZ=Europe/Moscow
     networks:
@@ -45,7 +45,6 @@ services:
       timeout: 5s
       retries: 5
     volumes:
-      - ./_data/postgres:/docker-entrypoint-initdb.d:z
       - postgres:/var/lib/postgresql/data
 
   guacd:
@@ -62,7 +61,7 @@ services:
       - ./_data/guacd/drive:/drive:rw
       - ./_data/guacd/record:/record:rw
     healthcheck:
-      test: ["CMD", "netstat", "-an", "|", "grep", ":4822"]
+      test: ["CMD-SHELL", "netstat -an | grep :4822"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -74,8 +73,12 @@ services:
     image: guacamole/guacamole:1.5.5
     restart: always
     depends_on:
-      - guacd
-      - postgres
+      migrator:
+        condition: service_completed_successfully
+      guacd:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       - TZ=Europe/Moscow
     env_file:
@@ -86,6 +89,8 @@ services:
     volumes:
       - ./_data/guacamole:/etc/guacamole:ro
       - ./_data/guacd/record:/record:rw
+    ports:
+      - "8080:8080"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/guacamole/"]
       interval: 30s
@@ -122,27 +127,49 @@ services:
       context: ./services/webapi
       dockerfile: Dockerfile
     restart: unless-stopped
-    tty: true
-    stdin_open: true
     ports:
       - "8001:8000"
     env_file:
       - ./env_files/postgres.env
     depends_on:
-      - postgres
+      migrator:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     networks:
       guacnetwork_compose:
         ipv4_address: 172.29.0.8
     volumes:
       - ./services/webapi:/app
       - ./_data/guacd/record:/record:ro
-    command: "bash"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  migrator:
+    container_name: migrator
+    hostname: migrator
+    build:
+      context: ./services/webapi
+      dockerfile: Dockerfile
+    restart: "no"
+    env_file:
+      - ./env_files/postgres.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      guacnetwork_compose:
+        ipv4_address: 172.29.0.9
+    volumes:
+      - ./services/webapi:/app
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+    command: sh -c "alembic -c alembic.ini upgrade head"
 
 networks:
   guacnetwork_compose:

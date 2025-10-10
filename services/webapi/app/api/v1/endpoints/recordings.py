@@ -3,6 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from typing import List
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
@@ -84,13 +85,13 @@ MOCK_RECORDINGS = [
 ]
 
 
-@router.get("/", response_model=list[Recording])
+@router.get("/", response_model=List[Recording])
 async def get_recordings(
     skip: int = 0,
     limit: int = 100,
     session_id: UUID | None = SESSION_ID_QUERY,
     is_processed: bool | None = IS_PROCESSED_QUERY,
-) -> list[Recording]:
+) -> List[Recording]:
     """Get list of recordings."""
     recordings = MOCK_RECORDINGS
 

@@ -1,18 +1,19 @@
 """History endpoints (read-only)."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, RootModel
 
 from app.db.session import get_db
 
-if TYPE_CHECKING:
-    from datetime import datetime
+# Import runtime types used by Pydantic schema generation
+from datetime import datetime
+from sqlalchemy.orm import Session
 
-    from sqlalchemy.orm import Session
+if TYPE_CHECKING:
+    # Kept for type checkers; runtime imports are above
+    pass
 
 from app.models.guac.history import GuacamoleConnectionHistory, GuacamoleUserHistory
 
@@ -23,6 +24,7 @@ db_dependency = Depends(get_db)
 
 
 class ConnectionHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     history_id: int
     user_id: int | None
     username: str
@@ -51,6 +53,7 @@ class ConnectionHistoryOut(BaseModel):
 
 
 class UserHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     history_id: int
     user_id: int | None
     username: str
@@ -69,15 +72,27 @@ class UserHistoryOut(BaseModel):
             end_date=m.end_date,
         )
 
+# Ensure Pydantic resolves forward references for OpenAPI generation
+ConnectionHistoryOut.model_rebuild()
+UserHistoryOut.model_rebuild()
 
-@router.get("/connections", response_model=list[ConnectionHistoryOut])
+
+class ConnectionHistoryOutList(RootModel[List[ConnectionHistoryOut]]):
+    pass
+
+
+class UserHistoryOutList(RootModel[List[UserHistoryOut]]):
+    pass
+
+
+@router.get("/connections")
 def get_connection_history(
     user_id: int | None = Query(None),
     connection_id: int | None = Query(None),
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = db_dependency,
-) -> list[ConnectionHistoryOut]:
+) -> ConnectionHistoryOutList:
     stmt = db.query(GuacamoleConnectionHistory)
     if user_id is not None:
         stmt = stmt.filter(GuacamoleConnectionHistory.user_id == user_id)
@@ -88,16 +103,18 @@ def get_connection_history(
         .limit(limit)
         .order_by(GuacamoleConnectionHistory.start_date.desc())
     )
-    return [ConnectionHistoryOut.from_model(h) for h in stmt.all()]
+    return ConnectionHistoryOutList(
+        [ConnectionHistoryOut.from_model(h) for h in stmt.all()]
+    )
 
 
-@router.get("/users", response_model=list[UserHistoryOut])
+@router.get("/users")
 def get_user_history(
     user_id: int | None = Query(None),
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     db: Session = db_dependency,
-) -> list[UserHistoryOut]:
+) -> UserHistoryOutList:
     stmt = db.query(GuacamoleUserHistory)
     if user_id is not None:
         stmt = stmt.filter(GuacamoleUserHistory.user_id == user_id)
@@ -106,4 +123,4 @@ def get_user_history(
         .limit(limit)
         .order_by(GuacamoleUserHistory.start_date.desc())
     )
-    return [UserHistoryOut.from_model(h) for h in stmt.all()]
+    return UserHistoryOutList([UserHistoryOut.from_model(h) for h in stmt.all()])

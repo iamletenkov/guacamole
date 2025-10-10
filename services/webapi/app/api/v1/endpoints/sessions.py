@@ -3,6 +3,7 @@
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from typing import List
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
@@ -94,13 +95,13 @@ MOCK_SESSIONS = [
 ]
 
 
-@router.get("/", response_model=list[Session])
+@router.get("/", response_model=List[Session])
 async def get_sessions(
     skip: int = 0,
     limit: int = 100,
     user_id: UUID | None = USER_ID_QUERY,
     is_active: bool | None = IS_ACTIVE_QUERY,
-) -> list[Session]:
+) -> List[Session]:
     """Get list of sessions."""
     sessions = MOCK_SESSIONS
 

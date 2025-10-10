@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -54,8 +54,8 @@ def create_sharing_profile(
     return SharingProfileOut.from_model(profile)
 
 
-@router.get("/", response_model=list[SharingProfileOut])
-def list_sharing_profiles(db: Session = db_dependency) -> list[SharingProfileOut]:
+@router.get("/", response_model=List[SharingProfileOut])
+def list_sharing_profiles(db: Session = db_dependency) -> List[SharingProfileOut]:
     repo = SharingProfileRepository(db)
     return [SharingProfileOut.from_model(x) for x in repo.list_profiles()]
 

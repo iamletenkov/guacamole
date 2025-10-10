@@ -23,3 +23,4 @@ class GuacamoleConnectionParameter(Base):
     parameter_value = Column(String(4096), nullable=False)
 
     __table_args__ = (PrimaryKeyConstraint("connection_id", "parameter_name"),)
+

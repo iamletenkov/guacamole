@@ -28,3 +28,4 @@ class GuacamoleConnectionGroup(Base):
     max_connections = Column(Integer)
     max_connections_per_user = Column(Integer)
     enable_session_affinity = Column(Boolean, nullable=False, default=False)
+

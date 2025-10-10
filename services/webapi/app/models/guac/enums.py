@@ -41,3 +41,4 @@ guacamole_proxy_encryption_method = PGEnum(
     "SSL",
     name="guacamole_proxy_encryption_method",
 )
+

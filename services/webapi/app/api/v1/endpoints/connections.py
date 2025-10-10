@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -66,10 +66,10 @@ def create_group(
     return ConnectionGroupOut.from_model(grp)
 
 
-@router.get("/groups", response_model=list[ConnectionGroupOut])
+@router.get("/groups", response_model=List[ConnectionGroupOut])
 def list_groups(
     parent_id: int | None = None, db: Session = db_dependency
-) -> list[ConnectionGroupOut]:
+) -> List[ConnectionGroupOut]:
     repo = ConnectionRepository(db)
     return [ConnectionGroupOut.from_model(x) for x in repo.list_groups(parent_id)]
 
@@ -112,10 +112,10 @@ def create_connection(
     return ConnectionOut.from_model(conn)
 
 
-@router.get("/", response_model=list[ConnectionOut])
+@router.get("/", response_model=List[ConnectionOut])
 def list_connections(
     parent_group_id: int | None = None, db: Session = db_dependency
-) -> list[ConnectionOut]:
+) -> List[ConnectionOut]:
     repo = ConnectionRepository(db)
     return [ConnectionOut.from_model(x) for x in repo.list_connections(parent_group_id)]
 

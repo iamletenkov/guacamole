@@ -134,3 +134,4 @@ class GuacamoleSystemPermission(Base):
     permission = Column(guacamole_system_permission_type, nullable=False)
 
     __table_args__ = (PrimaryKeyConstraint("entity_id", "permission"),)
+

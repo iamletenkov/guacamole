@@ -77,3 +77,4 @@ class GuacamoleConnectionGroupAttribute(Base):
     attribute_value = Column(String(4096), nullable=False)
 
     __table_args__ = (PrimaryKeyConstraint("connection_group_id", "attribute_name"),)
+

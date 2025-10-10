@@ -23,3 +23,4 @@ class GuacamoleSharingProfileParameter(Base):
     parameter_value = Column(String(4096), nullable=False)
 
     __table_args__ = (PrimaryKeyConstraint("sharing_profile_id", "parameter_name"),)
+

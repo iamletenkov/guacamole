@@ -21,3 +21,4 @@ class GuacamoleSharingProfile(Base):
         ),
         nullable=False,
     )
+
