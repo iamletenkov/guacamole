@@ -1,80 +1,121 @@
 # Spacer
 
-Modern containerized workspace management system with Apache Guacamole integration.
+Modern containerized remote desktop management system based on Apache Guacamole.
 
 ## Architecture
 
-This project provides a complete solution for managing remote desktop connections through Apache Guacamole with a modern REST API backend.
+This project provides a complete solution for managing remote desktop connections through Apache Guacamole with PostgreSQL backend and comprehensive session recording capabilities.
 
 ### Components
 
-- **Apache Guacamole** - Remote desktop gateway
-- **PostgreSQL** - Database for Guacamole and API data
-- **PgAdmin** - Database management interface
-- **WebAPI** - REST API for managing users, groups, connections, and permissions
-- **Docker Compose** - Container orchestration
+- **Apache Guacamole** - Remote desktop gateway with WebSocket support
+- **Guacd** - Guacamole daemon for protocol handling (VNC, RDP, SSH, Telnet)
+- **PostgreSQL** - Database for Guacamole configuration and user data
+- **PgAdmin** - Web-based database management interface
+- **Session Recordings** - Tomcat-based server for viewing recorded sessions
+- **Nginx** - Reverse proxy with WebSocket support for Guacamole
+- **Extensions** - Additional Guacamole authentication and functionality extensions
 
 ## Quick Start
 
-1. **Start all services:**
+1. **Deploy all services:**
    ```bash
    make deploy
    ```
 
 2. **Access applications:**
-   - Guacamole: http://localhost:8080/guacamole/
-   - WebAPI: http://localhost:8001/docs (Swagger UI)
-   - PgAdmin: http://localhost:8999
+   - **Guacamole Web Interface:** http://localhost/guacamole/
+   - **Session Recordings:** http://localhost/recordings/
+   - **PgAdmin:** http://localhost:8999
 
 3. **View logs:**
    ```bash
-   make logs
+   docker compose logs -f
    ```
 
-## Development
+## Features
 
-### WebAPI Development
-
-For detailed WebAPI development documentation, see [services/webapi/README.md](services/webapi/README.md).
-
-Run commands from the `services/webapi/` directory:
-- `make install` - Install dependencies
-- `make dev-install` - Install development dependencies
-- `make ci` - Run full CI pipeline (lint, format, test, type check)
-- `make build` - Build Docker image
-- `make push` - Push Docker image
-
-### Database Management
-
-- **Migrations:** `cd services/webapi && alembic upgrade head`
-- **Seed admin user:** Set `SEED_GUACADMIN=true` before running migrations
+- **Multi-Protocol Support:** VNC, RDP, SSH, Telnet connections
+- **Session Recording:** Complete session capture and playback
+- **Database Authentication:** PostgreSQL-backed user management
+- **WebSocket Tunneling:** Native browser-based remote access
+- **Load Balancing:** Nginx reverse proxy for scalability
+- **Health Monitoring:** Built-in health checks for all services
 
 ## Project Structure
 
 ```
-├── services/
-│   └── webapi/           # REST API service
-│       ├── app/          # Application code
-│       ├── alembic/      # Database migrations
-│       ├── tests/        # Test suite
-│       └── Dockerfile    # Container configuration
-├── _data/               # Persistent data volumes
-├── docker-compose.yml   # Service orchestration
-└── Makefile            # Development commands
+├── _data/                    # Persistent data volumes
+│   ├── guacamole/           # Guacamole configuration and extensions
+│   ├── guacd/               # Guacamole daemon data and recordings
+│   ├── postgres/            # PostgreSQL data and initialization
+│   └── tomcat/              # Tomcat configuration for recordings
+├── docker-compose.yml       # Service orchestration
+├── env_files/               # Environment configuration
+│   ├── guacamole.env        # Guacamole settings
+│   ├── pgadmin.env         # PgAdmin settings
+│   └── postgres.env        # PostgreSQL settings
+├── nginx/                   # Reverse proxy configuration
+│   ├── nginx.conf           # Main Nginx configuration
+│   └── conf.d/              # Site-specific configuration
+└── Makefile                # Development and deployment commands
 ```
 
-## API Documentation
+## Configuration
 
-- **WebAPI Swagger:** http://localhost:8001/docs
-- **Guacamole:** http://localhost:8080/guacamole/
+### Environment Variables
+
+Key configuration files in `env_files/`:
+
+- **PostgreSQL:** Database connection and initialization settings
+- **Guacamole:** Authentication and guacd connection configuration
+- **PgAdmin:** Admin interface access credentials
+
+### Extensions
+
+Available Guacamole extensions in `_data/guacamole/extensions/`:
+- **guacamole-auth-jdbc** - Database authentication
+- **guacamole-auth-quickconnect** - Quick connection templates
+- **guacamole-auth-sso** - Single sign-on authentication
+- **guacamole-display-statistics** - Connection statistics
+- **guacamole-history-recording-storage** - Session recording storage
+
+## Available Commands
+
+```bash
+make help          # Show all available commands
+make pull          # Pull all Docker images
+make deploy        # Deploy all services
+make down          # Stop and remove all containers
+make prune         # Clean up Docker system
+```
+
+## Default Access
+
+- **Guacamole:** Access the web interface and configure connections through the administrative interface
+- **PgAdmin:** Use the default credentials from `env_files/pgadmin.env` to manage the PostgreSQL database
+- **Admin Setup:** The system automatically creates a `guacadmin` user during initialization
+
+## Troubleshooting
+
+1. **Check service health:**
+   ```bash
+   docker compose ps
+   ```
+
+2. **View service logs:**
+   ```bash
+   docker compose logs [service-name]
+   ```
+
+3. **Restart specific service:**
+   ```bash
+   docker compose restart [service-name]
+   ```
 
 ## Contributing
 
-1. **WebAPI Development:**
-   - Navigate to `services/webapi/`
-   - Install dependencies: `make dev-install`
-   - Run tests: `make test`
-   - Check code quality: `make ci`
-   - Build Docker image: `make build`
-
-2. **Deploy:** `make deploy` (from project root)
+1. **Make changes to configuration files as needed**
+2. **Test deployment:** `make deploy`
+3. **Verify functionality** across all services
+4. **Document any new features or changes**

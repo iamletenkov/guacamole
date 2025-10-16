@@ -33,19 +33,6 @@ pull: ## Pull all images
 	HOSTNAME=$(HOSTNAME) \
 	docker compose -f $(DOCKER_COMPOSE_FILE) -p "$(DOCKER_STACK_NAME)" pull
 
-build: ## Build all images
-	@echo "#######################################################"
-	@echo "[step] build"
-	@echo "#######################################################"
-	@echo "LOCAL_IP:           		$(LOCAL_IP)"
-	@echo "HOSTNAME:           		$(HOSTNAME)"
-	@echo "DOCKER_STACK_NAME:  		$(DOCKER_STACK_NAME)"
-	@echo "DOCKER_COMPOSE_FILE:		$(DOCKER_COMPOSE_FILE)"
-	COMPOSE_DOCKER_CLI_BUILD=1 \
-	DOCKER_BUILDKIT=1 \
-	HOSTNAME=$(HOSTNAME) \
-	docker compose -f $(DOCKER_COMPOSE_FILE) -p "$(DOCKER_STACK_NAME)" build
-
 deploy: ## Deploy all services
 	@echo "#######################################################"
 	@echo "[step] deploy"
@@ -70,7 +57,7 @@ down: ## Stop and remove containers
 	COMPOSE_DOCKER_CLI_BUILD=1 \
 	DOCKER_BUILDKIT=1 \
 	HOSTNAME=$(HOSTNAME) \
-	docker compose -f $(DOCKER_COMPOSE_FILE) -p "$(DOCKER_STACK_NAME)" down
+	docker compose -f $(DOCKER_COMPOSE_FILE) -p "$(DOCKER_STACK_NAME)" down --volumes
 
 prune: ## Clean up Docker system
 	@echo "#######################################################"
