@@ -87,6 +87,7 @@ services:
     volumes:
       - ./_data/guacamole:/etc/guacamole
       - ./_data/guacd/record:/record:rw
+      - ./_data/guacamole/guacamole.properties:/etc/guacamole/guacamole.properties:ro
     ports:
       - "8080:8080"
     healthcheck:

@@ -41,6 +41,11 @@ deploy: ## Deploy all services
 	@echo "HOSTNAME:           		$(HOSTNAME)"
 	@echo "DOCKER_STACK_NAME:  		$(DOCKER_STACK_NAME)"
 	@echo "DOCKER_COMPOSE_FILE:		$(DOCKER_COMPOSE_FILE)"
+
+	sudo mkdir -p _data/guacd/record
+	sudo chown -R 1000:1001 _data/guacd/record
+	sudo chmod -R 775 _data/guacd/record
+	
 	COMPOSE_DOCKER_CLI_BUILD=1 \
 	DOCKER_BUILDKIT=1 \
 	HOSTNAME=$(HOSTNAME) \

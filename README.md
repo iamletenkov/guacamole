@@ -1,121 +1,257 @@
 # Spacer
 
-Modern containerized remote desktop management system based on Apache Guacamole.
+Современная контейнеризованная система управления удаленными рабочими столами на основе Apache Guacamole.
 
-## Architecture
+## Архитектура
 
-This project provides a complete solution for managing remote desktop connections through Apache Guacamole with PostgreSQL backend and comprehensive session recording capabilities.
+Этот проект предоставляет полное решение для управления удаленными подключениями к рабочим столам через Apache Guacamole с бэкендом PostgreSQL и возможностями записи сессий.
 
-### Components
+### Компоненты
 
-- **Apache Guacamole** - Remote desktop gateway with WebSocket support
-- **Guacd** - Guacamole daemon for protocol handling (VNC, RDP, SSH, Telnet)
-- **PostgreSQL** - Database for Guacamole configuration and user data
-- **PgAdmin** - Web-based database management interface
-- **Session Recordings** - Tomcat-based server for viewing recorded sessions
-- **Nginx** - Reverse proxy with WebSocket support for Guacamole
-- **Extensions** - Additional Guacamole authentication and functionality extensions
+- **Apache Guacamole** - Шлюз удаленного рабочего стола с поддержкой WebSocket
+- **Guacd** - Демон Guacamole для обработки протоколов (VNC, RDP, SSH, Telnet)
+- **PostgreSQL** - База данных для конфигурации Guacamole и пользовательских данных
+- **PgAdmin** - Веб-интерфейс для управления базой данных
+- **Session Recordings** - Сервер на базе Tomcat для просмотра записанных сессий
+- **Nginx** - Обратный прокси с поддержкой WebSocket для Guacamole
+- **Extensions** - Дополнительные расширения аутентификации и функциональности Guacamole
 
-## Quick Start
+## Быстрый старт
 
-1. **Deploy all services:**
+1. **Развернуть все сервисы:**
    ```bash
    make deploy
    ```
 
-2. **Access applications:**
-   - **Guacamole Web Interface:** http://localhost/guacamole/
-   - **Session Recordings:** http://localhost/recordings/
+2. **Доступ к приложениям:**
+   - **Веб-интерфейс Guacamole:** http://localhost/guacamole/
+   - **Записи сессий:** http://localhost/recordings/
    - **PgAdmin:** http://localhost:8999
 
-3. **View logs:**
+3. **Просмотр логов:**
    ```bash
    docker compose logs -f
    ```
 
-## Features
+## Возможности
 
-- **Multi-Protocol Support:** VNC, RDP, SSH, Telnet connections
-- **Session Recording:** Complete session capture and playback
-- **Database Authentication:** PostgreSQL-backed user management
-- **WebSocket Tunneling:** Native browser-based remote access
-- **Load Balancing:** Nginx reverse proxy for scalability
-- **Health Monitoring:** Built-in health checks for all services
+- **Поддержка множественных протоколов:** Подключения VNC, RDP, SSH, Telnet
+- **Запись сессий:** Полная запись и воспроизведение сессий
+- **Аутентификация через базу данных:** Управление пользователями через PostgreSQL
+- **WebSocket туннелирование:** Нативный браузерный удаленный доступ
+- **Балансировка нагрузки:** Обратный прокси Nginx для масштабируемости
+- **Мониторинг состояния:** Встроенные проверки здоровья для всех сервисов
 
-## Project Structure
+## Конфигурация записи сессий
+
+### Создание подключений с записью
+
+Для включения записи сессий для ваших подключений выполните следующие шаги:
+
+1. **Доступ к административному интерфейсу Guacamole:**
+   - Перейдите по адресу: `http://your-server/guacamole/#/settings/postgresql/connections`
+   - Войдите как `guacadmin` / `guacadmin`
+
+2. **Создание нового подключения:**
+   - Нажмите кнопку "New Connection"
+   - Заполните детали подключения:
+
+   **Основные настройки:**
+   - **Имя:** Описательное имя для вашего подключения
+   - **Протокол:** SSH, RDP, VNC или Telnet
+   - **Имя хоста:** IP-адрес или имя целевого сервера
+   - **Порт:** Порт подключения (22 для SSH, 3389 для RDP, 5900+ для VNC)
+   - **Имя пользователя:** Имя пользователя для входа
+   - **Пароль:** Пароль для входа (или используйте аутентификацию по ключу для SSH)
+
+   **Настройки записи:**
+   - **Путь записи:** `/record/${HISTORY_UUID}`
+   - **Имя записи:** `session` (или любое описательное имя)
+   - **Создавать путь записи автоматически:** ✅ Включить эту опцию
+
+3. **Примеры конфигураций подключений:**
+
+   **SSH подключение:**
+   ```
+   Имя: Production Server SSH
+   Протокол: SSH
+   Имя хоста: 192.168.1.100
+   Порт: 22
+   Имя пользователя: admin
+   Пароль: your_password
+   Путь записи: /record/${HISTORY_UUID}
+   Имя записи: session
+   ```
+
+   **RDP подключение:**
+   ```
+   Имя: Windows Server RDP
+   Протокол: RDP
+   Имя хоста: 192.168.1.200
+   Порт: 3389
+   Имя пользователя: administrator
+   Пароль: your_password
+   Путь записи: /record/${HISTORY_UUID}
+   Имя записи: session
+   ```
+
+   **VNC подключение:**
+   ```
+   Имя: Linux Desktop VNC
+   Протокол: VNC
+   Имя хоста: 192.168.1.150
+   Порт: 5901
+   Пароль: vnc_password
+   Путь записи: /record/${HISTORY_UUID}
+   Имя записи: session
+   ```
+
+### Структура файлов записей
+
+Записи автоматически сохраняются в директорию хоста:
+```
+_data/guacd/record/
+├── {HISTORY_UUID_1}/
+│   └── session.guac
+├── {HISTORY_UUID_2}/
+│   └── session.guac
+└── {HISTORY_UUID_3}/
+    └── session.guac
+```
+
+### Просмотр записей
+
+1. **Доступ к истории:**
+   - Перейдите в основной интерфейс Guacamole
+   - Нажмите на вкладку "History"
+   - Найдите сессию вашего подключения
+
+2. **Воспроизведение:**
+   - Найдите ссылку "View" в колонке "Logs"
+   - Нажмите для открытия интерфейса воспроизведения записи
+   - Используйте элементы управления для навигации по сессии
+
+### Важные заметки
+
+- **Путь записи:** Всегда используйте формат `/record/${HISTORY_UUID}`
+- **Автоматическое создание пути:** Включите опцию "Create recording path automatically"
+- **Права доступа к файлам:** Система автоматически устанавливает правильные права (1000:1001, 775)
+- **Место хранения:** Записи хранятся в `_data/guacd/record/` на хосте
+- **Формат файла:** Записи сохраняются в формате `.guac` для эффективного хранения
+
+## Структура проекта
 
 ```
-├── _data/                    # Persistent data volumes
-│   ├── guacamole/           # Guacamole configuration and extensions
-│   ├── guacd/               # Guacamole daemon data and recordings
-│   ├── postgres/            # PostgreSQL data and initialization
-│   └── tomcat/              # Tomcat configuration for recordings
-├── docker-compose.yml       # Service orchestration
-├── env_files/               # Environment configuration
-│   ├── guacamole.env        # Guacamole settings
-│   ├── pgadmin.env         # PgAdmin settings
-│   └── postgres.env        # PostgreSQL settings
-├── nginx/                   # Reverse proxy configuration
-│   ├── nginx.conf           # Main Nginx configuration
-│   └── conf.d/              # Site-specific configuration
-└── Makefile                # Development and deployment commands
+├── _data/                    # Постоянные тома данных
+│   ├── guacamole/           # Конфигурация и расширения Guacamole
+│   ├── guacd/               # Данные демона Guacamole и записи
+│   ├── postgres/            # Данные и инициализация PostgreSQL
+│   └── tomcat/              # Конфигурация Tomcat для записей
+├── docker-compose.yml       # Оркестрация сервисов
+├── env_files/               # Конфигурация окружения
+│   ├── guacamole.env        # Настройки Guacamole
+│   ├── pgadmin.env         # Настройки PgAdmin
+│   └── postgres.env        # Настройки PostgreSQL
+├── nginx/                   # Конфигурация обратного прокси
+│   ├── nginx.conf           # Основная конфигурация Nginx
+│   └── conf.d/              # Конфигурация для конкретных сайтов
+└── Makefile                # Команды разработки и развертывания
 ```
 
-## Configuration
+## Конфигурация
 
-### Environment Variables
+### Переменные окружения
 
-Key configuration files in `env_files/`:
+Ключевые файлы конфигурации в `env_files/`:
 
-- **PostgreSQL:** Database connection and initialization settings
-- **Guacamole:** Authentication and guacd connection configuration
-- **PgAdmin:** Admin interface access credentials
+- **PostgreSQL:** Настройки подключения к базе данных и инициализации
+- **Guacamole:** Конфигурация аутентификации и подключения к guacd
+- **PgAdmin:** Учетные данные доступа к административному интерфейсу
 
-### Extensions
+### Расширения
 
-Available Guacamole extensions in `_data/guacamole/extensions/`:
-- **guacamole-auth-jdbc** - Database authentication
-- **guacamole-auth-quickconnect** - Quick connection templates
-- **guacamole-auth-sso** - Single sign-on authentication
-- **guacamole-display-statistics** - Connection statistics
-- **guacamole-history-recording-storage** - Session recording storage
+Доступные расширения Guacamole в `_data/guacamole/extensions/`:
+- **guacamole-auth-jdbc** - Аутентификация через базу данных
+- **guacamole-auth-quickconnect** - Шаблоны быстрых подключений
+- **guacamole-auth-sso** - Аутентификация единого входа
+- **guacamole-display-statistics** - Статистика подключений
+- **guacamole-history-recording-storage** - Хранение записей сессий
 
-## Available Commands
+## Доступные команды
 
 ```bash
-make help          # Show all available commands
-make pull          # Pull all Docker images
-make deploy        # Deploy all services
-make down          # Stop and remove all containers
-make prune         # Clean up Docker system
+make help          # Показать все доступные команды
+make pull          # Загрузить все Docker образы
+make deploy        # Развернуть все сервисы
+make down          # Остановить и удалить все контейнеры
+make prune         # Очистить систему Docker
 ```
 
-## Default Access
+## Доступ по умолчанию
 
-- **Guacamole:** Access the web interface and configure connections through the administrative interface
-- **PgAdmin:** Use the default credentials from `env_files/pgadmin.env` to manage the PostgreSQL database
-- **Admin Setup:** The system automatically creates a `guacadmin` user during initialization
+- **Guacamole:** Доступ к веб-интерфейсу и настройка подключений через административный интерфейс
+- **PgAdmin:** Используйте учетные данные по умолчанию из `env_files/pgadmin.env` для управления базой данных PostgreSQL
+- **Настройка администратора:** Система автоматически создает пользователя `guacadmin` при инициализации
 
-## Troubleshooting
+## Устранение неполадок
 
-1. **Check service health:**
+### Общие проблемы
+
+1. **Проверка состояния сервисов:**
    ```bash
    docker compose ps
    ```
 
-2. **View service logs:**
+2. **Просмотр логов сервисов:**
    ```bash
    docker compose logs [service-name]
    ```
 
-3. **Restart specific service:**
+3. **Перезапуск конкретного сервиса:**
    ```bash
    docker compose restart [service-name]
    ```
 
-## Contributing
+### Проблемы с записями
 
-1. **Make changes to configuration files as needed**
-2. **Test deployment:** `make deploy`
-3. **Verify functionality** across all services
-4. **Document any new features or changes**
+**Проблема: Записи не отображаются в веб-интерфейсе**
+
+1. **Проверка прав доступа к директории записей:**
+   ```bash
+   ls -la _data/guacd/record/
+   # Должно показывать: drwxrwxr-x 1000 1001
+   ```
+
+2. **Исправление прав при необходимости:**
+   ```bash
+   sudo chown -R 1000:1001 _data/guacd/record
+   sudo chmod -R 775 _data/guacd/record
+   ```
+
+3. **Проверка пути записи в настройках подключения:**
+   - Должно быть: `/record/${HISTORY_UUID}`
+   - НЕ должно быть: `/record/${HISTORY_PATH}/${HISTORY_UUID}`
+
+4. **Проверка логов guacd на ошибки записи:**
+   ```bash
+   docker compose logs guacd | grep -i recording
+   ```
+
+**Проблема: Ошибка "No such file or directory" в логах guacd**
+
+- Убедитесь, что включена опция "Create recording path automatically"
+- Проверьте формат пути записи: `/record/${HISTORY_UUID}`
+- Проверьте, что директория записи существует и имеет правильные права
+
+**Проблема: Невозможно просматривать записи в браузере**
+
+- Убедитесь, что файлы записей существуют в `_data/guacd/record/{UUID}/`
+- Проверьте, что контейнер guacamole может читать файлы (права 775)
+- Перезапустите контейнер guacamole: `docker compose restart guacamole`
+
+## Вклад в проект
+
+1. **Внесите необходимые изменения в файлы конфигурации**
+2. **Протестируйте развертывание:** `make deploy`
+3. **Проверьте функциональность** всех сервисов
+4. **Документируйте любые новые функции или изменения**
