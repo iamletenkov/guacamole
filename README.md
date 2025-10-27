@@ -255,3 +255,21 @@ make prune         # Очистить систему Docker
 2. **Протестируйте развертывание:** `make deploy`
 3. **Проверьте функциональность** всех сервисов
 4. **Документируйте любые новые функции или изменения**
+
+
+
+
+# Wireguard
+
+## *ВАЖНО*:
+
+Если после перезагрузки сервера клиенты не могут никуда достучаться и `traceroute` обрывается на wg сервере, нужно в настройках `wireguard-ui` в разделе сервера прописать (указывай корректную сеть в `POSTROUTING` !!!):
+
+```bash
+# PostUp
+iptables -A FORWARD -i %i -o eth0 -j ACCEPT; iptables -A FORWARD -i eth0 -o %i -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
+
+# PostDown
+iptables -D FORWARD -i %i -o eth0 -j ACCEPT; iptables -D FORWARD -i eth0 -o %i -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
+
+```
