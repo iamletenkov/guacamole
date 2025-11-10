@@ -1,275 +1,175 @@
-# Spacer
+# guacamole
 
-Современная контейнеризованная система управления удаленными рабочими столами на основе Apache Guacamole.
+Контейнеризованный стенд Apache Guacamole c PostgreSQL-бэкендом, сервером записей сессий и дополнительным VPN-периметром на WireGuard.
 
-## Архитектура
+## Требования
 
-Этот проект предоставляет полное решение для управления удаленными подключениями к рабочим столам через Apache Guacamole с бэкендом PostgreSQL и возможностями записи сессий.
+- Docker 24+ и Docker Compose v2
+- GNU Make
+- Пользователь с правами `sudo` (цель `make deploy` меняет владельца `_data/guacd/record`)
+- Свободные порты: 80/tcp, 8080/tcp, 8081/tcp, 8999/tcp, 5000/tcp, 51820/udp
 
-### Компоненты
+## Состав стенда
 
-- **Apache Guacamole** - Шлюз удаленного рабочего стола с поддержкой WebSocket
-- **Guacd** - Демон Guacamole для обработки протоколов (VNC, RDP, SSH, Telnet)
-- **PostgreSQL** - База данных для конфигурации Guacamole и пользовательских данных
-- **PgAdmin** - Веб-интерфейс для управления базой данных
-- **Session Recordings** - Сервер на базе Tomcat для просмотра записанных сессий
-- **Nginx** - Обратный прокси с поддержкой WebSocket для Guacamole
-- **Extensions** - Дополнительные расширения аутентификации и функциональности Guacamole
+| Сервис | Образ | Назначение | Порты/URL |
+| --- | --- | --- | --- |
+| `nginx` | `nginx:1.27-alpine` | Обратный прокси для Guacamole и просмотра записей, WebSocket-терминация | `80 -> /guacamole` и `/recordings` |
+| `guacamole` | `guacamole/guacamole:1.6.0` | Веб-клиент Apache Guacamole (Tomcat) | `8080:8080`, также проброшен через `nginx` |
+| `guacd` | `guacamole/guacd:1.6.0` | Демон протоколов VNC/RDP/SSH/Telnet | 4822/tcp (внутри сети `guacnetwork_compose`) |
+| `postgres` | `postgres:18.0-alpine3.21` | Хранилище конфигураций и пользователей | 5432/tcp (внутри сети) |
+| `pgadmin` | `dpage/pgadmin4:9.8.0` | UI для управления PostgreSQL | `8999:80` |
+| `guacamole_recordings` | `tomcat:10.1-jdk17` | Отдаёт записи сессий из `_data/guacd/record` | `8081:8080`, также доступно как `/recordings` через `nginx` |
+| `wireguard` | `linuxserver/wireguard:v1.0.20210914-ls6` | VPN-шлюз WireGuard + проброс порта для UI | `51820/udp` для клиентов, `5000/tcp` для UI |
+| `wireguard-ui` | `ngoduykhanh/wireguard-ui:latest` | Веб-панель управления WireGuard (делит сеть с `wireguard`) | Доступна через `http://localhost:5000` |
 
-## Быстрый старт
+Все сервисы подключены к пользовательской подсети `172.29.0.0/24` с фиксированными IP-адресами (см. `docker-compose.yml`).
 
-1. **Развернуть все сервисы:**
+## Структура репозитория
+
+- `docker-compose.yml` – точное описание всех сервисов, сетей, volume и healthcheck'ов.
+- `Makefile` – цели `pull`, `deploy`, `down`, `prune`; каждая запускает `docker compose -p guacamole -f docker-compose.yml`.
+- `env_files/*.env` – параметры PostgreSQL, Guacamole и PgAdmin.
+- `_data/guacd/record` – каталог записей; примонтирован в `guacd`, `guacamole` и `guacamole_recordings`.
+- `_data/guacd/drive` – общий «диск» для операций копирования файлов.
+- `_data/guacamole` – конфигурация Guacamole (`guacamole.properties`, tar-пакеты расширений).
+- `_data/postgres` – SQL-инициализация БД (включая создание пользователя `guacadmin`).
+- `_data/tomcat/conf/...` – описание контекста `/recordings` для Tomcat.
+- `_data/wireguard/{config,db}` – конфигурации сервера и данные UI.
+- `nginx/nginx.conf`, `nginx/conf.d/default.conf` – прокси-логика и правила WebSocket.
+
+## Настройка окружения
+
+### env_files
+
+- `env_files/postgres.env` – значения `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`. Используются как в контейнере Postgres, так и PgAdmin при подключении.
+- `env_files/guacamole.env` – флаги `RECORDING_ENABLED`, `RECORDING_SEARCH_PATH=/record`, `QUICKCONNECT_ENABLED`, а также DSN к PostgreSQL. Здесь же включено автоматическое создание пользователей (`POSTGRESQL_AUTO_CREATE_ACCOUNTS=true`).
+- `env_files/pgadmin.env` – логин/пароль PgAdmin. После входа добавьте сервер с хостом `postgres`, портом `5432`, пользователем `guacamole` и паролем `guacamole`.
+
+Пересоберите стек после изменения любого файла `.env`.
+
+### Постоянные каталоги
+
+Команда `make deploy` гарантирует существование `_data/guacd/record` и выставляет владельца `1000:1001` с правами `775` (именно эти UID/GID используются в официальном образе `guacamole`). Остальные каталоги создаются Docker автоматически, но их можно подготовить вручную:
+
+- `_data/guacamole/extensions` – положите дополнительные расширения Guacamole (`.tar.gz`).
+- `_data/wireguard/config` – хранит `wg0.conf`; не удаляйте при обновлениях.
+- `_data/wireguard/db` – база `wireguard-ui` со списком клиентов.
+
+## Развертывание
+
+1. Скачать образы:
+   ```bash
+   make pull
+   ```
+2. Запустить все сервисы (требует `sudo` для подготовки каталога записей):
    ```bash
    make deploy
    ```
-
-2. **Доступ к приложениям:**
-   - **Веб-интерфейс Guacamole:** http://localhost/guacamole/
-   - **Записи сессий:** http://localhost/recordings/
-   - **PgAdmin:** http://localhost:8999
-
-3. **Просмотр логов:**
+3. Остановить и удалить стек вместе с volume (будьте осторожны – данные будут удалены):
    ```bash
-   docker compose logs -f
+   make down
+   ```
+4. Очистить Docker-хост:
+   ```bash
+   make prune
    ```
 
-## Возможности
+Для ручного запуска используйте `docker compose -f docker-compose.yml -p guacamole up -d`.
 
-- **Поддержка множественных протоколов:** Подключения VNC, RDP, SSH, Telnet
-- **Запись сессий:** Полная запись и воспроизведение сессий
-- **Аутентификация через базу данных:** Управление пользователями через PostgreSQL
-- **WebSocket туннелирование:** Нативный браузерный удаленный доступ
-- **Балансировка нагрузки:** Обратный прокси Nginx для масштабируемости
-- **Мониторинг состояния:** Встроенные проверки здоровья для всех сервисов
+## Доступ к сервисам и учетные данные
+
+| Назначение | URL/порт | Учетные данные по умолчанию | Примечание |
+| --- | --- | --- | --- |
+| Guacamole через `nginx` | `http://localhost/guacamole/` | `guacadmin / guacadmin` (создаётся в `_data/postgres/01_create_guacamole_db.sql`) | Смените пароль после первого входа |
+| Guacamole напрямую | `http://localhost:8080/guacamole/` | те же | Удобно для отладки Tomcat |
+| Просмотр записей | `http://localhost/recordings/` или `http://localhost:8081/recordings/` | не требуется | Файлы лежат в `_data/guacd/record/${HISTORY_UUID}` |
+| PgAdmin 4 | `http://localhost:8999` | `pgadmin4@pgadmin.org / admin` | Добавьте сервер `postgres:5432` |
+| PostgreSQL | `postgres:5432` (внутренняя сеть) | `guacamole / guacamole` | Используется Guacamole и PgAdmin |
+| WireGuard UI | `http://localhost:5000` | `admin / CyberDSTPASS` | Значения задаются в `docker-compose.yml`, рекомендуем заменить |
+| WireGuard VPN | `<ваш_хост>:51820/udp` | ключи генерируются в UI | Конфигурации сохраняются в `_data/wireguard/config` |
 
 ## Конфигурация записи сессий
 
-### Создание подключений с записью
+В контейнере Guacamole включены флаги `RECORDING_ENABLED=true` и `RECORDING_SEARCH_PATH=/record`, поэтому достаточно указать путь в настройках подключения:
 
-Для включения записи сессий для ваших подключений выполните следующие шаги:
+1. Перейдите в `http://<host>/guacamole/#/settings/postgresql/connections` под `guacadmin`.
+2. Создайте или отредактируйте подключение:
+   - **Recording path:** `/record/${HISTORY_UUID}`
+   - **Recording name:** `session` (или любое другое)
+   - **Create recording path automatically:** включить.
+3. Сохраните подключение и выполните тестовую сессию. Файлы появятся в `_data/guacd/record/<UUID>/session.guac`.
 
-1. **Доступ к административному интерфейсу Guacamole:**
-   - Перейдите по адресу: `http://your-server/guacamole/#/settings/postgresql/connections`
-   - Войдите как `guacadmin` / `guacadmin`
+Сервер `guacamole_recordings` монтирует тот же каталог в режиме `ro` и публикует его через Tomcat, а `nginx` проксирует `/recordings` наружу.
 
-2. **Создание нового подключения:**
-   - Нажмите кнопку "New Connection"
-   - Заполните детали подключения:
+## Управление и диагностика
 
-   **Основные настройки:**
-   - **Имя:** Описательное имя для вашего подключения
-   - **Протокол:** SSH, RDP, VNC или Telnet
-   - **Имя хоста:** IP-адрес или имя целевого сервера
-   - **Порт:** Порт подключения (22 для SSH, 3389 для RDP, 5900+ для VNC)
-   - **Имя пользователя:** Имя пользователя для входа
-   - **Пароль:** Пароль для входа (или используйте аутентификацию по ключу для SSH)
+- Проверить состояние контейнеров:
+  ```bash
+  docker compose -p guacamole -f docker-compose.yml ps
+  ```
+- Общие логи:
+  ```bash
+  docker compose -p guacamole -f docker-compose.yml logs -f
+  ```
+- Логи конкретного сервиса:
+  ```bash
+  docker compose -p guacamole -f docker-compose.yml logs guacd
+  ```
+- Переcтартовать сервис:
+  ```bash
+  docker compose -p guacamole -f docker-compose.yml restart guacamole
+  ```
 
-   **Настройки записи:**
-   - **Путь записи:** `/record/${HISTORY_UUID}`
-   - **Имя записи:** `session` (или любое описательное имя)
-   - **Создавать путь записи автоматически:** ✅ Включить эту опцию
+## Траблшутинг записей
 
-3. **Примеры конфигураций подключений:**
+**Записи не отображаются в каталоге**
 
-   **SSH подключение:**
-   ```
-   Имя: Production Server SSH
-   Протокол: SSH
-   Имя хоста: 192.168.1.100
-   Порт: 22
-   Имя пользователя: admin
-   Пароль: your_password
-   Путь записи: /record/${HISTORY_UUID}
-   Имя записи: session
-   ```
-
-   **RDP подключение:**
-   ```
-   Имя: Windows Server RDP
-   Протокол: RDP
-   Имя хоста: 192.168.1.200
-   Порт: 3389
-   Имя пользователя: administrator
-   Пароль: your_password
-   Путь записи: /record/${HISTORY_UUID}
-   Имя записи: session
-   ```
-
-   **VNC подключение:**
-   ```
-   Имя: Linux Desktop VNC
-   Протокол: VNC
-   Имя хоста: 192.168.1.150
-   Порт: 5901
-   Пароль: vnc_password
-   Путь записи: /record/${HISTORY_UUID}
-   Имя записи: session
-   ```
-
-### Структура файлов записей
-
-Записи автоматически сохраняются в директорию хоста:
-```
-_data/guacd/record/
-├── {HISTORY_UUID_1}/
-│   └── session.guac
-├── {HISTORY_UUID_2}/
-│   └── session.guac
-└── {HISTORY_UUID_3}/
-    └── session.guac
-```
-
-### Просмотр записей
-
-1. **Доступ к истории:**
-   - Перейдите в основной интерфейс Guacamole
-   - Нажмите на вкладку "History"
-   - Найдите сессию вашего подключения
-
-2. **Воспроизведение:**
-   - Найдите ссылку "View" в колонке "Logs"
-   - Нажмите для открытия интерфейса воспроизведения записи
-   - Используйте элементы управления для навигации по сессии
-
-### Важные заметки
-
-- **Путь записи:** Всегда используйте формат `/record/${HISTORY_UUID}`
-- **Автоматическое создание пути:** Включите опцию "Create recording path automatically"
-- **Права доступа к файлам:** Система автоматически устанавливает правильные права (1000:1001, 775)
-- **Место хранения:** Записи хранятся в `_data/guacd/record/` на хосте
-- **Формат файла:** Записи сохраняются в формате `.guac` для эффективного хранения
-
-## Структура проекта
-
-```
-├── _data/                    # Постоянные тома данных
-│   ├── guacamole/           # Конфигурация и расширения Guacamole
-│   ├── guacd/               # Данные демона Guacamole и записи
-│   ├── postgres/            # Данные и инициализация PostgreSQL
-│   └── tomcat/              # Конфигурация Tomcat для записей
-├── docker-compose.yml       # Оркестрация сервисов
-├── env_files/               # Конфигурация окружения
-│   ├── guacamole.env        # Настройки Guacamole
-│   ├── pgadmin.env         # Настройки PgAdmin
-│   └── postgres.env        # Настройки PostgreSQL
-├── nginx/                   # Конфигурация обратного прокси
-│   ├── nginx.conf           # Основная конфигурация Nginx
-│   └── conf.d/              # Конфигурация для конкретных сайтов
-└── Makefile                # Команды разработки и развертывания
-```
-
-## Конфигурация
-
-### Переменные окружения
-
-Ключевые файлы конфигурации в `env_files/`:
-
-- **PostgreSQL:** Настройки подключения к базе данных и инициализации
-- **Guacamole:** Конфигурация аутентификации и подключения к guacd
-- **PgAdmin:** Учетные данные доступа к административному интерфейсу
-
-### Расширения
-
-Доступные расширения Guacamole в `_data/guacamole/extensions/`:
-- **guacamole-auth-jdbc** - Аутентификация через базу данных
-- **guacamole-auth-quickconnect** - Шаблоны быстрых подключений
-- **guacamole-auth-sso** - Аутентификация единого входа
-- **guacamole-display-statistics** - Статистика подключений
-- **guacamole-history-recording-storage** - Хранение записей сессий
-
-## Доступные команды
-
-```bash
-make help          # Показать все доступные команды
-make pull          # Загрузить все Docker образы
-make deploy        # Развернуть все сервисы
-make down          # Остановить и удалить все контейнеры
-make prune         # Очистить систему Docker
-```
-
-## Доступ по умолчанию
-
-- **Guacamole:** Доступ к веб-интерфейсу и настройка подключений через административный интерфейс
-- **PgAdmin:** Используйте учетные данные по умолчанию из `env_files/pgadmin.env` для управления базой данных PostgreSQL
-- **Настройка администратора:** Система автоматически создает пользователя `guacadmin` при инициализации
-
-## Устранение неполадок
-
-### Общие проблемы
-
-1. **Проверка состояния сервисов:**
-   ```bash
-   docker compose ps
-   ```
-
-2. **Просмотр логов сервисов:**
-   ```bash
-   docker compose logs [service-name]
-   ```
-
-3. **Перезапуск конкретного сервиса:**
-   ```bash
-   docker compose restart [service-name]
-   ```
-
-### Проблемы с записями
-
-**Проблема: Записи не отображаются в веб-интерфейсе**
-
-1. **Проверка прав доступа к директории записей:**
+1. Убедитесь, что права каталога корректны:
    ```bash
    ls -la _data/guacd/record/
-   # Должно показывать: drwxrwxr-x 1000 1001
+   # ожидается: drwxrwxr-x 1000 1001
    ```
-
-2. **Исправление прав при необходимости:**
+2. При необходимости восстановите владельца:
    ```bash
    sudo chown -R 1000:1001 _data/guacd/record
    sudo chmod -R 775 _data/guacd/record
    ```
-
-3. **Проверка пути записи в настройках подключения:**
-   - Должно быть: `/record/${HISTORY_UUID}`
-   - НЕ должно быть: `/record/${HISTORY_PATH}/${HISTORY_UUID}`
-
-4. **Проверка логов guacd на ошибки записи:**
+3. Проверьте, что в настройках подключения указан путь `/record/${HISTORY_UUID}` (без `${HISTORY_PATH}`).
+4. Проанализируйте логи `guacd`:
    ```bash
    docker compose logs guacd | grep -i recording
    ```
 
-**Проблема: Ошибка "No such file or directory" в логах guacd**
+**Ошибка `No such file or directory` в `guacd`**
 
-- Убедитесь, что включена опция "Create recording path automatically"
-- Проверьте формат пути записи: `/record/${HISTORY_UUID}`
-- Проверьте, что директория записи существует и имеет правильные права
+- Опция *Create recording path automatically* должна быть включена.
+- Директория `_data/guacd/record` должна существовать до старта контейнера.
 
-**Проблема: Невозможно просматривать записи в браузере**
+**Запись не воспроизводится в браузере**
 
-- Убедитесь, что файлы записей существуют в `_data/guacd/record/{UUID}/`
-- Проверьте, что контейнер guacamole может читать файлы (права 775)
-- Перезапустите контейнер guacamole: `docker compose restart guacamole`
+- Проверьте, что файлы есть в `_data/guacd/record/<UUID>/`.
+- Убедитесь, что `guacamole` и `guacamole_recordings` имеют доступ только для чтения (права `775`).
+- Перезапустите Tomcat-подсистему:
+  ```bash
+  docker compose restart guacamole guacamole_recordings
+  ```
 
-## Вклад в проект
+## WireGuard
 
-1. **Внесите необходимые изменения в файлы конфигурации**
-2. **Протестируйте развертывание:** `make deploy`
-3. **Проверьте функциональность** всех сервисов
-4. **Документируйте любые новые функции или изменения**
+- Конфигурация сервера хранится в `_data/wireguard/config/wg0.conf`, а база UI – в `_data/wireguard/db`.
+- Параметры `PostUp`/`PostDown` нужно задать в интерфейсе `wireguard-ui` (раздел Server settings). Для подсети `10.100.0.0/24` используйте:
+  ```bash
+  # PostUp
+  iptables -A FORWARD -i %i -o eth0 -j ACCEPT; iptables -A FORWARD -i eth0 -o %i -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
 
+  # PostDown
+  iptables -D FORWARD -i %i -o eth0 -j ACCEPT; iptables -D FORWARD -i eth0 -o %i -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
+  ```
+- После перезагрузки хоста убедитесь, что `wireguard` поднят (`docker compose ps`) и что правила NAT применены заново.
 
+## Вклад
 
-
-# Wireguard
-
-## *ВАЖНО*:
-
-Если после перезагрузки сервера клиенты не могут никуда достучаться и `traceroute` обрывается на wg сервере, нужно в настройках `wireguard-ui` в разделе сервера прописать (указывай корректную сеть в `POSTROUTING` !!!):
-
-```bash
-# PostUp
-iptables -A FORWARD -i %i -o eth0 -j ACCEPT; iptables -A FORWARD -i eth0 -o %i -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
-
-# PostDown
-iptables -D FORWARD -i %i -o eth0 -j ACCEPT; iptables -D FORWARD -i eth0 -o %i -m state --state RELATED,ESTABLISHED -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.100.0.0/24 -o eth0 -j MASQUERADE
-
-```
+1. Вносите изменения в конфигурацию.
+2. Проверяйте развертывание: `make deploy`.
+3. Прогоняйте smoke-тесты (вход в Guacamole, открытие `/recordings`, доступ в PgAdmin).
+4. Документируйте новые особенности перед созданием PR.
