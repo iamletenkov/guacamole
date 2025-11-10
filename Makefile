@@ -1,5 +1,5 @@
 
-DOCKER_STACK_NAME := spacer
+DOCKER_STACK_NAME := guacamole
 DOCKER_COMPOSE_FILE := docker-compose.yml
 LOCAL_IP := $(shell hostname -I | cut -d' ' -f1)
 HOSTNAME := $(shell hostname)
